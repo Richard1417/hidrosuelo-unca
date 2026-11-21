@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HidroSuelo UNCA — Huamachuco, La Libertad</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --verde-oscuro: #064e1e;
+      --verde-primario: #229605;
+      --verde-claro: #ecfdf5;
+      --verde-borde: #a7f3d0;
+      --fondo: #f3f6f4;
+      --tarjeta: #ffffff;
+      --texto: #1e293b;
+      --subtexto: #64748b;
+      --borde: #e2e8f0;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: var(--fondo); color: var(--texto); }
+
+    .navbar {
+      background: linear-gradient(135deg, #043927 0%, #065f46 100%);
+      color: #fff;
+      padding: 14px 28px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand-logo {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.28);
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .brand h1 { margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 9px; letter-spacing: -0.2px; }
+    .badge-modo {
+      font-size: 0.72rem; background: #047857; padding: 3px 10px;
+      border-radius: 6px; border: 1px solid #34d399; font-weight: 600;
+    }
+    .brand p { margin: 2px 0 0; font-size: 0.8rem; color: #a7f3d0; }
+
+    .status-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .pill {
+      background: rgba(0,0,0,0.28);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .pill.inactivo {
+      background: rgba(148, 163, 184, 0.16);
+      border-color: rgba(148, 163, 184, 0.35);
+      color: #cbd5e1;
+    }
+
+    .sky-pill {
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .sky-icon-wrap {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .sky-pill.madrugada { background: #115e59; border-color: #5eead4; color: #ccfbf1; }
+    .sky-pill.dia { background: #047857; border-color: #6ee7b7; color: #ecfdf5; }
+    .sky-pill.atardecer { background: #1c4532; border-color: #fcd34d; color: #fef3c7; }
+    .sky-pill.noche { background: #022c22; border-color: #34d399; color: #a7f3d0; }
+
+    @keyframes parpadeoVerde {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px #22c55e; }
+      50% { opacity: 0.25; box-shadow: none; }
+    }
+    .led {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #94a3b8; flex-shrink: 0;
+    }
+    .led.verde-parpadeo {
+      background: #22c55e;
+      animation: parpadeoVerde 1.2s infinite ease-in-out;
+    }
+    .led.gris {
+      background: #94a3b8;
+      box-shadow: none;
+      animation: none;
+    }
+
+    .container { max-width: 1260px; margin: 22px auto; padding: 0 18px; display: flex; flex-direction: column; gap: 18px; }
+    .card {
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .control-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .control-title h2 { margin: 0; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+    .control-title p { margin: 4px 0 0; font-size: 0.82rem; color: var(--subtexto); }
+
+    .cultivo-box { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    select, .btn {
+      padding: 8px 14px; border-radius: 8px; border: 1px solid var(--borde);
+      font-size: 0.85rem; background: #fff; color: var(--texto); cursor: pointer;
+    }
+    .btn { font-weight: 600; transition: 0.15s; }
+    .btn:hover:not(:disabled) { filter: brightness(0.95); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-lluvia { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .btn-riego { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+    .btn-secado { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .btn-ir-sim { background: #0f172a; color: #fff; border: none; }
+    .btn-ir-vivo { background: var(--verde-primario); color: #fff; border: none; }
+
+    .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; }
+    @media (max-width: 820px) { .slider-row { grid-template-columns: 1fr; } }
+    .slider-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.85rem; }
+    .pct-badge {
+      background: var(--verde-claro); color: var(--verde-primario);
+      border: 1px solid var(--verde-borde); padding: 3px 10px; border-radius: 6px; font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--verde-primario);
+      cursor: pointer;
+    }
+    input[type="range"].bloqueado-vivo {
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+
+    .slider-labels { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--subtexto); margin-top: 4px; }
+    .slider-labels span.opt { color: var(--verde-primario); font-weight: 600; }
+    .sim-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .grid-3-kpi { display: grid; grid-template-columns: 0.9fr 1.2fr 1.3fr; gap: 18px; }
+    @media (max-width: 1024px) { .grid-3-kpi { grid-template-columns: 1fr; } }
+
+    .kpi-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--subtexto); letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+    .kpi-big { font-size: 2.6rem; font-weight: 800; margin: 12px 0; display: flex; align-items: baseline; gap: 6px; }
+    .kpi-big small { font-size: 1.1rem; font-weight: 600; color: var(--subtexto); }
+    .progress-bar { height: 8px; background: #e2e8f0; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+    .progress-fill { height: 100%; background: var(--verde-primario); width: 35%; transition: width 0.3s; }
+
+    .diag-pill { padding: 4px 10px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; background: var(--verde-claro); color: var(--verde-primario); border: 1px solid var(--verde-borde); }
+    .diag-box {
+      margin: 14px 0; padding: 14px; border-radius: 8px;
+      display: flex; align-items: flex-start; gap: 12px;
+      background: var(--verde-claro); border: 1px solid var(--verde-borde);
+    }
+    .diag-icon {
+      width: 28px; height: 28px; border-radius: 6px; background: var(--verde-primario);
+      color: #fff; display: grid; place-items: center; font-weight: bold; flex-shrink: 0;
+    }
+    .diag-box h4 { margin: 0 0 3px; font-size: 0.86rem; color: var(--verde-oscuro); text-transform: uppercase; }
+    .diag-box p { margin: 0; font-size: 0.82rem; color: #334155; line-height: 1.4; }
+    .umbrales { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--subtexto); }
+
+    .rec-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 9px; }
+    .rec-item {
+      display: flex; align-items: flex-start; gap: 9px;
+      font-size: 0.83rem; color: #334155; background: #f8fafc;
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
+      line-height: 1.38;
+    }
+    .rec-bullet {
+      width: 20px; height: 20px; border-radius: 5px;
+      background: var(--verde-claro); color: var(--verde-primario);
+      font-size: 0.72rem; font-weight: 700; display: grid; place-items: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+
+    .table-wrap { overflow-x: auto; max-height: 460px; overflow-y: auto; margin-top: 12px; border: 1px solid var(--borde); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th { position: sticky; top: 0; z-index: 2; text-align: left; padding: 10px 12px; background: #f8fafc; color: var(--subtexto); font-size: 0.74rem; text-transform: uppercase; border-bottom: 1px solid var(--borde); }
+    td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+    .estado-tag { padding: 3px 9px; border-radius: 6px; font-size: 0.73rem; font-weight: 700; white-space: nowrap; }
+    .badge-total {
+      background: var(--verde-claro); color: var(--verde-primario);
+      border: 1px solid var(--verde-borde); padding: 3px 9px;
+      border-radius: 6px; font-size: 0.75rem; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a7f3d0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          <path d="M12 18v-6"/>
+          <path d="M12 14c1.8 0 3.2-1.2 3.2-3-1.8 0-3.2 1.2-3.2 3z"/>
+          <path d="M12 15c-1.8 0-3.2-1.2-3.2-3 1.8 0 3.2 1.2 3.2 3z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>HidroSuelo UNCA <span class="badge-modo" id="badge-origen">ESP32 En Vivo</span></h1>
+        <p>Monitoreo de Humedad del Suelo • Huamachuco, Sánchez Carrión, La Libertad – Perú</p>
+      </div>
+    </div>
+
+    <div class="status-pills">
+      <div class="sky-pill dia" id="pill-ciclo-solar">
+        <div class="sky-icon-wrap" id="sky-icon-wrap">
+          <svg id="svg-madrugada" style="display:none" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v3"/><path d="M5.6 6.6l2.1 2.1"/><path d="M18.4 6.6l-2.1 2.1"/>
+            <path d="M3 13h2"/><path d="M19 13h2"/>
+            <path d="M8 13a4 4 0 0 1 8 0"/>
+            <line x1="2" y1="13" x2="22" y2="13"/>
+            <line x1="5" y1="17" x2="10" y2="17"/><line x1="14" y1="17" x2="19" y2="17"/>
+            <line x1="9" y1="20" x2="15" y2="20"/>
+          </svg>
+          <svg id="svg-dia" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4.5"/>
+            <line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/>
+            <line x1="4.93" y1="4.93" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.07" y2="19.07"/>
+            <line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/>
+            <line x1="4.93" y1="19.07" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="19.07" y2="4.93"/>
+          </svg>
+          <svg id="svg-atardecer" style="display:none" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v3"/><path d="M5.6 6.6l2.1 2.1"/><path d="M18.4 6.6l-2.1 2.1"/>
+            <path d="M3 13h2"/><path d="M19 13h2"/>
+            <path d="M8 13a4 4 0 0 1 8 0Z" fill="currentColor"/>
+            <line x1="2" y1="13" x2="22" y2="13"/>
+            <line x1="5" y1="17" x2="10" y2="17"/><line x1="14" y1="17" x2="19" y2="17"/>
+            <line x1="9" y1="20" x2="15" y2="20"/>
+          </svg>
+          <svg id="svg-noche" style="display:none" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M13.5 3.5a8.5 8.5 0 1 0 7 13.3 7 7 0 0 1-7-13.3Z"/>
+            <path d="M17.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6.6-1.4Z"/>
+            <path d="M20.5 8.5l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4.4-1Z"/>
+            <path d="M16.5 10l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4.4-1Z"/>
+          </svg>
+        </div>
+        <span id="txt-ciclo">Día</span>
+      </div>
+
+      <div class="pill" id="pill-fecha-hora">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a7f3d0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span id="txt-fecha-hora">Sincronizando fecha...</span>
+      </div>
+
+      <div class="pill inactivo" id="pill-esp32">
+        <span class="led gris" id="led-esp32"></span>
+        <span id="txt-esp32">ESP32: Verificando...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="card">
+      <div class="control-header">
+        <div class="control-title">
+          <h2>🎛️ Panel de Control en Vivo y Simulación del Cultivo</h2>
+          <p id="desc-panel-control">Estás visualizando las lecturas reales enviadas por tu ESP32 en tiempo real.</p>
+        </div>
+        <div class="cultivo-box">
+          <label for="select-cultivo" style="font-size:0.83rem; font-weight:600;">🌾 Cultivo:</label>
+          <select id="select-cultivo" onchange="cambiarCultivo()">
+            <option value="papa">Papa (Solanum tuberosum)</option>
+            <option value="maiz">Maíz Amiláceo (Zea mays)</option>
+            <option value="eucalipto">Eucalipto (Eucalyptus globulus)</option>
+            <option value="hortalizas">Hortalizas de Chacra</option>
+          </select>
+          <button class="btn btn-ir-sim" id="btn-alternar-modo" onclick="alternarModo()">🧪 Cambiar a Modo Simulación</button>
+        </div>
+      </div>
+
+      <div class="slider-row">
+        <div>
+          <div class="slider-info">
+            <span>💧 Nivel de Humedad del Suelo (<strong id="fuente-lectura">Lectura Real ESP32</strong>):</span>
+            <span class="pct-badge" id="slider-pct">-- %</span>
+          </div>
+          <input type="range" id="slider-humedad" class="bloqueado-vivo" min="0" max="100" value="35" oninput="aplicarSimulacionManual(this.value)" />
+          <div class="slider-labels">
+            <span>0% (Seco: ADC 3450)</span>
+            <span class="opt" id="lbl-zona-optima">Zona Óptima: 35% - 75%</span>
+            <span>100% (Agua: ADC 310)</span>
+          </div>
+        </div>
+        <div class="sim-buttons">
+          <button class="btn btn-lluvia" id="btn-lluvia" disabled onclick="ajustarHumedad(20)">🌧️ +20% Lluvia</button>
+          <button class="btn btn-riego" id="btn-riego" disabled onclick="ajustarHumedad(10)">💧 +10% Riego</button>
+          <button class="btn btn-secado" id="btn-secado" disabled onclick="ajustarHumedad(-15)">☀️ -15% Secado</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-3-kpi">
+      <div class="card">
+        <div class="kpi-label"><span>HUMEDAD DE SUELO</span> <span>💧</span></div>
+        <div class="kpi-big"><span id="kpi-humedad">--</span><small>%</small></div>
+        <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:var(--subtexto);">
+          <span>Valor Analógico ADC (Pin 34):</span>
+          <strong id="kpi-adc" style="color:var(--texto);">---- ADC</strong>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="barra-humedad"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">
+          <span>🌿 DIAGNÓSTICO DE LA CHACRA</span>
+          <span class="diag-pill" id="pill-estado">ESPERANDO</span>
+        </div>
+        <div class="diag-box" id="caja-diagnostico">
+          <div class="diag-icon" id="icono-diag">✓</div>
+          <div>
+            <h4 id="titulo-diag">SINCRONIZANDO LECTURA</h4>
+            <p id="texto-diag">Leyendo la última muestra recibida en Google Sheets...</p>
+          </div>
+        </div>
+        <div class="umbrales">
+          <span>Tierra Seca: <strong id="lbl-umbral-seco">&lt; 35%</strong></span>
+          <span>Mucha Agua: <strong id="lbl-umbral-exceso">&gt; 75%</strong></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">
+          <span>📋 RECOMENDACIONES • HUAMACHUCO</span>
+          <span style="font-size:0.72rem; color:var(--verde-primario);" id="rec-cultivo-tag">PAPA</span>
+        </div>
+        <ul class="rec-list" id="lista-recomendaciones">
+          <li class="rec-item">
+            <span class="rec-bullet">1</span>
+            <span>Esperando lectura del sensor para darle consejos de riego en su parcela.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="control-header" style="margin-bottom:8px;">
+        <div class="control-title">
+          <h2>📈 Evolución Temporal de Humedad del Suelo (Últimas 20 lecturas)</h2>
+          <p id="subtitulo-grafico">Historial continuo de lecturas reales enviadas por el ESP32</p>
+        </div>
+      </div>
+      <canvas id="graficoHumedad" height="90"></canvas>
+    </section>
+
+    <section class="card">
+      <div class="control-header" style="margin-bottom:6px;">
+        <div class="control-title">
+          <h2>🗃️ Registro Histórico Completo de Lecturas Recibidas <span class="badge-total" id="badge-total-filas">0 registros</span></h2>
+          <p id="subtitulo-tabla">Ordenado del más reciente (arriba) al más antiguo (abajo) • Sincronizado con Google Sheets</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" id="btn-actualizar" onclick="cargarDatosReales()">🔄 Actualizar Ahora</button>
+          <button class="btn btn-riego" onclick="exportarCSV()">📥 Exportar Todos a Excel (CSV)</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Cultivo</th>
+              <th>Humedad (%)</th>
+              <th>ADC Raw (Pin 34)</th>
+              <th>Estado Suelo</th>
+              <th>Consejo para Huamachuco</th>
+              <th>Origen</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const URL_API = "https://script.google.com/macros/s/AKfycby2eIpnbuc-tSU_1ZoqZ50373bjqltFlX2Syw9VSfPDjRvBPVd1JRfv3hiPCNksmyTayw/exec";
+    const VALOR_SECO = 3450;
+    const VALOR_AGUA = 310;
+
+    const CULTIVOS = {
+      papa: {
+        nombre: "Papa", min: 35, max: 75,
+        optimo: "La tierra de su parcela tiene la humedad justa para que la papa cuaje bien y eche buen tubérculo.",
+        seco: "La tierra está muy seca. En el clima de Huamachuco el sol y el viento secan rápido el surco; hay que echar agua pronto.",
+        exceso: "Hay demasiada agua empozada en el surco. Con el frío de altura la papa se puede pudrir o agarrar rancha.",
+        recs: {
+          optimo: [
+            "No hace falta soltar agua de la acequia hoy; la tierra guarda buena humedad en el camellón.",
+            "Mantener bien aporcada la papa para guardar la frescura y protegerla de las heladas de madrugada.",
+            "Volver a mirar el medidor al mediodía, cuando el sol de sierra calienta más fuerte."
+          ],
+          seco: [
+            "Soltar agua suave por los surcos bien temprano (6:00 a 8:30 a.m.) antes que caliente fuerte el sol.",
+            "Si la chacra está en ladera, regar despacio para que el agua entre a la raíz y no lave la tierra.",
+            "Revisar en un par de horas que la humedad suba por encima del 45 %."
+          ],
+          exceso: [
+            "Cortar el riego de inmediato y abrir desagüe al pie de los surcos para que corra el agua sobrante.",
+            "Con las lluvias y neblina de Huamachuco, revisar las hojas de abajo por si aparece rancha.",
+            "No volver a regar hasta que la tierra oree y baje de 70 % de humedad."
+          ]
+        }
+      },
+      maiz: {
+        nombre: "Maíz Amiláceo", min: 40, max: 70,
+        optimo: "La tierra está fresca y parejita para que la caña crezca fuerte y llene bien el choclo.",
+        seco: "Falta humedad en la chacra. Si las hojas empiezan a acartucharse al sol, el maíz tiene sed.",
+        exceso: "Tierra muy aguada. El exceso de agua y el frío nocturno ponen amarillas las hojas del maíz.",
+        recs: {
+          optimo: [
+            "Seguir con el mismo turno de riego; la tierra tiene buena frescura para la planta.",
+            "Buen momento para aporcar o echar guano/abono porque la humedad ayuda a que prenda rápido.",
+            "Evitar meter yunta o pisar mucho la melga mientras la tierra esté húmeda."
+          ],
+          seco: [
+            "Regar por los surcos en la mañana temprano o al atardecer para que el viento no se lleve el agua.",
+            "Asegurar que el agua llegue bien al pie de cada mata, sobre todo cuando está jiloteando.",
+            "Mojar parejo hasta que el medidor pase del 45 % de humedad."
+          ],
+          exceso: [
+            "Cerrar la toma de acequia y abrir sangraderas para que escurra el agua empozada.",
+            "Evitar charcos por más de un día para que no se pudra el pie de la caña.",
+            "Esperar a que la tierra oree y baje de 60 % antes del próximo turno de agua."
+          ]
+        }
+      },
+      eucalipto: {
+        nombre: "Eucalipto", min: 25, max: 65,
+        optimo: "La tierra tiene humedad suficiente para que los plantones prendan y crezcan firmes en ladera.",
+        seco: "La tierra está seca arriba. Los plantones tiernos necesitan un poco de agua para no secarse.",
+        exceso: "Demasiada agua alrededor de la raíz; conviene dejar que el suelo respire.",
+        recs: {
+          optimo: [
+            "No necesita riego por ahora; la humedad guardada en el hoyo alcanza bien.",
+            "Limpiar el kikuyo o mala hierba alrededor del arbolito para que no le robe el agua.",
+            "Seguir mirando cómo baja la humedad durante la semana en épocas secas (mayo a septiembre)."
+          ],
+          seco: [
+            "Echar de 3 a 5 litros de agua al pie de cada plantón nuevo en horas de la mañana.",
+            "Tapar el pie del arbolito con ichu, paja o champa seca para que el sol no seque la raíz.",
+            "Revisar al día siguiente si la tierra conserva frescura."
+          ],
+          exceso: [
+            "Suspender el riego y dejar que el aire y el sol sequen un poco el terreno.",
+            "En cerro o ladera, hacer pequeñas zanjas de coronación para que la lluvia no arrastre la tierra.",
+            "Vigilar que no se pudra el tallito tierno en la base."
+          ]
+        }
+      },
+      hortalizas: {
+        nombre: "Hortalizas de Chacra", min: 50, max: 80,
+        optimo: "La tierra está bien fresquita, ideal para que las hortalizas crezcan tiernas y verdes.",
+        seco: "La cama se está secando rápido con el sol. Como tienen raíz corta, necesitan agua pronto.",
+        exceso: "Cama encharcada. Mucha agua con frío nocturno puede pudrir las hojas de abajo.",
+        recs: {
+          optimo: [
+            "Seguir con riegos cortos y seguidos para mantener siempre fresca la cama de cultivo.",
+            "Regar en la mañana para que las hojas lleguen secas a la noche y no les caiga hielo.",
+            "Revisar el medidor a media tarde cuando baja el sol."
+          ],
+          seco: [
+            "Regar de inmediato con chorro suave o regadera para no tumbar las plantitas tiernas.",
+            "Dar dos riegos cortos seguidos para que la tierra negra absorba bien el agua.",
+            "Si el sol está muy fuerte al mediodía, esperar a las 4:30 p.m. para regar."
+          ],
+          exceso: [
+            "Suspender el riego hoy y abrir salida en los bordes de la cama para que escurra el agua.",
+            "Sacar hojas amarillas o pegadas al barro para evitar hongos.",
+            "Volver a regar recién cuando la humedad baje de 75 %."
+          ]
+        }
+      }
+    };
+
+    let modoSimulacion = false;
+    let intervaloSimulacion = null;
+    let humedadActual = 35;
+    let adcActual = 2320;
+    let registrosReales = [];
+    let registrosSimulados = [];
+
+    const ctx = document.getElementById('graficoHumedad').getContext('2d');
+    const grafico = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Humedad de Suelo (%)',
+            data: [],
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5, 150, 105, 0.12)',
+            borderWidth: 2.5,
+            tension: 0.35,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: '#059669'
+          },
+          {
+            label: 'Límite Riego (Seco)',
+            data: [],
+            borderColor: '#f59e0b',
+            borderDash: [6, 6],
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+      }
+    });
+
+    function mostrarIconoSolar(fase) {
+      document.getElementById('svg-madrugada').style.display = fase === 'madrugada' ? 'block' : 'none';
+      document.getElementById('svg-dia').style.display = fase === 'dia' ? 'block' : 'none';
+      document.getElementById('svg-atardecer').style.display = fase === 'atardecer' ? 'block' : 'none';
+      document.getElementById('svg-noche').style.display = fase === 'noche' ? 'block' : 'none';
+    }
+
+    function actualizarFechaHoraYCiclo(fechaObj) {
+      const diasSemana = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const diaNombre = diasSemana[fechaObj.getDay()];
+      const dd = String(fechaObj.getDate()).padStart(2, '0');
+      const mm = String(fechaObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = fechaObj.getFullYear();
+      const hh = String(fechaObj.getHours()).padStart(2, '0');
+      const min = String(fechaObj.getMinutes()).padStart(2, '0');
+      const ss = String(fechaObj.getSeconds()).padStart(2, '0');
+
+      document.getElementById('txt-fecha-hora').textContent =
+        `${diaNombre} ${dd}/${mm}/${yyyy} • ${hh}:${min}:${ss}`;
+
+      const hora = fechaObj.getHours();
+      const pillCiclo = document.getElementById('pill-ciclo-solar');
+      const txtCiclo = document.getElementById('txt-ciclo');
+
+      if (hora >= 5 && hora < 7) {
+        pillCiclo.className = "sky-pill madrugada";
+        mostrarIconoSolar('madrugada');
+        txtCiclo.textContent = "Madrugada";
+      } else if (hora >= 7 && hora < 17) {
+        pillCiclo.className = "sky-pill dia";
+        mostrarIconoSolar('dia');
+        txtCiclo.textContent = "Día";
+      } else if (hora >= 17 && hora < 19) {
+        pillCiclo.className = "sky-pill atardecer";
+        mostrarIconoSolar('atardecer');
+        txtCiclo.textContent = "Atardecer";
+      } else {
+        pillCiclo.className = "sky-pill noche";
+        mostrarIconoSolar('noche');
+        txtCiclo.textContent = "Noche";
+      }
+    }
+
+    function construirFechaDesdeRegistro(ultimo) {
+      if (ultimo && ultimo.timestampMs) {
+        return new Date(ultimo.timestampMs);
+      }
+      if (ultimo && ultimo.hora) {
+        const partes = String(ultimo.hora).split(':').map(Number);
+        const f = new Date();
+        if (partes.length >= 2 && !isNaN(partes[0])) {
+          f.setHours(partes[0], partes[1], partes[2] || 0, 0);
+          return f;
+        }
+      }
+      return new Date();
+    }
+
+    function actualizarEstadoESP32(espConectado) {
+      const pillEsp = document.getElementById('pill-esp32');
+      const ledEsp = document.getElementById('led-esp32');
+      const txtEsp = document.getElementById('txt-esp32');
+      if (espConectado) {
+        pillEsp.classList.remove('inactivo');
+        ledEsp.className = "led verde-parpadeo";
+        txtEsp.textContent = modoSimulacion ? "Simulador: Activo (2 s)" : "ESP32: En Línea";
+      } else {
+        pillEsp.classList.add('inactivo');
+        ledEsp.className = "led gris";
+        txtEsp.textContent = "ESP32: Desconectado";
+      }
+    }
+
+    function evaluarEstado(humedad, cultivoKey) {
+      const c = CULTIVOS[cultivoKey];
+      if (humedad < c.min) {
+        return { clave: "seco", estado: "TIERRA SECA", titulo: "FALTA AGUA — HAY QUE REGAR", texto: c.seco, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" };
+      }
+      if (humedad > c.max) {
+        return { clave: "exceso", estado: "MUCHA AGUA", titulo: "TIERRA MUY AGUADA — NO REGAR", texto: c.exceso, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" };
+      }
+      return { clave: "optimo", estado: "HUMEDAD BUENA", titulo: "TIERRA FRESCA Y PAREJA", texto: c.optimo, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" };
+    }
+
+    function actualizarInterfaz(humedad, adc) {
+      humedadActual = Math.max(0, Math.min(100, Math.round(humedad)));
+      adcActual = Math.round(adc);
+      const cultivoKey = document.getElementById('select-cultivo').value;
+      const c = CULTIVOS[cultivoKey];
+      const diag = evaluarEstado(humedadActual, cultivoKey);
+
+      const slider = document.getElementById('slider-humedad');
+      slider.value = humedadActual;
+      slider.style.accentColor = diag.color;
+
+      document.getElementById('slider-pct').textContent = humedadActual + " %";
+      document.getElementById('kpi-humedad').textContent = humedadActual;
+      document.getElementById('kpi-adc').textContent = adcActual + " ADC";
+      document.getElementById('barra-humedad').style.width = humedadActual + "%";
+      document.getElementById('barra-humedad').style.background = diag.color;
+
+      document.getElementById('lbl-zona-optima').textContent = `Zona Óptima: ${c.min}% - ${c.max}%`;
+      document.getElementById('lbl-umbral-seco').textContent = `< ${c.min}%`;
+      document.getElementById('lbl-umbral-exceso').textContent = `> ${c.max}%`;
+
+      const pill = document.getElementById('pill-estado');
+      pill.textContent = diag.estado;
+      pill.style.background = diag.bg;
+      pill.style.color = diag.color;
+      pill.style.border = `1px solid ${diag.border}`;
+
+      const caja = document.getElementById('caja-diagnostico');
+      caja.style.background = diag.bg;
+      caja.style.borderColor = diag.border;
+      document.getElementById('icono-diag').style.background = diag.color;
+      document.getElementById('icono-diag').textContent = diag.clave === "optimo" ? "✓" : "!";
+      document.getElementById('titulo-diag').textContent = diag.titulo;
+      document.getElementById('titulo-diag').style.color = diag.color;
+      document.getElementById('texto-diag').textContent = diag.texto;
+
+      document.getElementById('rec-cultivo-tag').textContent = c.nombre.toUpperCase();
+      const listaRecs = document.getElementById('lista-recomendaciones');
+      const acciones = c.recs[diag.clave];
+      listaRecs.innerHTML = acciones.map((accion, idx) => `
+        <li class="rec-item">
+          <span class="rec-bullet" style="background:${diag.bg}; color:${diag.color};">${idx + 1}</span>
+          <span>${accion}</span>
+        </li>
+      `).join("");
+    }
+
+    function renderizarHistorial(registros) {
+      const cultivoKey = document.getElementById('select-cultivo').value;
+      const c = CULTIVOS[cultivoKey];
+
+      // Gráfica: muestra los últimos 20 puntos cronológicos para legibilidad
+      const ultimos20 = registros.slice(-20);
+      grafico.data.labels = ultimos20.map(r => r.hora);
+      grafico.data.datasets[0].data = ultimos20.map(r => r.humedad);
+      grafico.data.datasets[1].data = ultimos20.map(() => c.min);
+      grafico.update();
+
+      // Tabla: muestra TODOS los registros invertidos (más reciente arriba)
+      document.getElementById('badge-total-filas').textContent = `${registros.length} registros`;
+      const tbody = document.getElementById('tabla-body');
+      tbody.innerHTML = "";
+      const invertidos = [...registros].reverse();
+
+      invertidos.forEach(r => {
+        const d = evaluarEstado(r.humedad, cultivoKey);
+        const primeraRec = c.recs[d.clave][0];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r.hora}</td>
+          <td><strong>${c.nombre}</strong></td>
+          <td style="color:${d.color}; font-weight:700;">${r.humedad}%</td>
+          <td>${r.crudo}</td>
+          <td><span class="estado-tag" style="background:${d.bg}; color:${d.color};">${d.estado}</span></td>
+          <td>${primeraRec}</td>
+          <td>${modoSimulacion ? "Simulación (2 s)" : "ESP32 Real"}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function cargarDatosReales() {
+      if (modoSimulacion) return;
+      try {
+        const res = await fetch(URL_API);
+        const datos = await res.json();
+
+        if (datos.length > 0 && !modoSimulacion) {
+          registrosReales = datos;
+          const ultimo = datos[datos.length - 1];
+          const fechaLectura = construirFechaDesdeRegistro(ultimo);
+
+          const segundosDesdeUltimo = (Date.now() - fechaLectura.getTime()) / 1000;
+          const estaEnLinea = segundosDesdeUltimo >= -15 && segundosDesdeUltimo <= 30;
+
+          actualizarFechaHoraYCiclo(fechaLectura);
+          actualizarEstadoESP32(estaEnLinea);
+          actualizarInterfaz(ultimo.humedad, ultimo.crudo);
+          renderizarHistorial(registrosReales);
+        } else {
+          actualizarFechaHoraYCiclo(new Date());
+          actualizarEstadoESP32(false);
+        }
+      } catch (e) {
+        actualizarFechaHoraYCiclo(new Date());
+        actualizarEstadoESP32(false);
+      }
+    }
+
+    function generarDatoSimuladoAutomatico() {
+      if (!modoSimulacion) return;
+      const variacion = Math.floor(Math.random() * 5) - 2;
+      const nuevaHumedad = Math.max(5, Math.min(95, humedadActual + variacion));
+      const adcSimulado = Math.round(VALOR_SECO - (nuevaHumedad / 100) * (VALOR_SECO - VALOR_AGUA));
+      const ahoraObj = new Date();
+      const ahoraTexto = ahoraObj.toTimeString().split(' ')[0];
+
+      actualizarFechaHoraYCiclo(ahoraObj);
+      actualizarEstadoESP32(true);
+      actualizarInterfaz(nuevaHumedad, adcSimulado);
+      registrosSimulados.push({ hora: ahoraTexto, crudo: adcSimulado, humedad: nuevaHumedad });
+      renderizarHistorial(registrosSimulados);
+    }
+
+    function actualizarBloqueoControles() {
+      const slider = document.getElementById('slider-humedad');
+      if (modoSimulacion) {
+        slider.classList.remove('bloqueado-vivo');
+      } else {
+        slider.classList.add('bloqueado-vivo');
+      }
+      document.getElementById('btn-lluvia').disabled = !modoSimulacion;
+      document.getElementById('btn-riego').disabled = !modoSimulacion;
+      document.getElementById('btn-secado').disabled = !modoSimulacion;
+      document.getElementById('btn-actualizar').disabled = modoSimulacion;
+    }
+
+    function alternarModo() {
+      modoSimulacion = !modoSimulacion;
+      actualizarBloqueoControles();
+
+      const btn = document.getElementById('btn-alternar-modo');
+      const badge = document.getElementById('badge-origen');
+      const fuente = document.getElementById('fuente-lectura');
+      const desc = document.getElementById('desc-panel-control');
+      const subGrafico = document.getElementById('subtitulo-grafico');
+      const subTabla = document.getElementById('subtitulo-tabla');
+
+      if (intervaloSimulacion) {
+        clearInterval(intervaloSimulacion);
+        intervaloSimulacion = null;
+      }
+
+      if (modoSimulacion) {
+        btn.textContent = "📡 Volver a Modo En Vivo";
+        btn.className = "btn btn-ir-vivo";
+        badge.textContent = "Modo Simulación";
+        fuente.textContent = "Simulación (cada 2 s) + Manual";
+        desc.textContent = "Generando lecturas simuladas cada 2 segundos. También puedes mover el deslizador o probar lluvia y riego.";
+        subGrafico.textContent = "Historial de simulación en tiempo real (nuevo dato simulado cada 2 segundos)";
+        subTabla.textContent = "Ordenado del más reciente (arriba) al más antiguo (abajo) • Registro de pruebas simuladas";
+
+        registrosSimulados = [];
+        generarDatoSimuladoAutomatico();
+        intervaloSimulacion = setInterval(generarDatoSimuladoAutomatico, 2000);
+      } else {
+        btn.textContent = "🧪 Cambiar a Modo Simulación";
+        btn.className = "btn btn-ir-sim";
+        badge.textContent = "ESP32 En Vivo";
+        fuente.textContent = "Lectura Real ESP32";
+        desc.textContent = "Estás visualizando las lecturas reales enviadas por tu ESP32 en tiempo real.";
+        subGrafico.textContent = "Historial continuo de lecturas reales enviadas por el ESP32";
+        subTabla.textContent = 'Ordenado del más reciente (arriba) al más antiguo (abajo) • Sincronizado con Google Sheets';
+
+        cargarDatosReales();
+      }
+    }
+
+    function aplicarSimulacionManual(valorPct) {
+      if (!modoSimulacion) return;
+      const pct = Math.max(0, Math.min(100, Number(valorPct)));
+      const adcSimulado = Math.round(VALOR_SECO - (pct / 100) * (VALOR_SECO - VALOR_AGUA));
+      const ahoraObj = new Date();
+      const ahoraTexto = ahoraObj.toTimeString().split(' ')[0];
+      actualizarFechaHoraYCiclo(ahoraObj);
+      actualizarInterfaz(pct, adcSimulado);
+
+      registrosSimulados.push({ hora: ahoraTexto, crudo: adcSimulado, humedad: pct });
+      renderizarHistorial(registrosSimulados);
+    }
+
+    function ajustarHumedad(delta) {
+      if (!modoSimulacion) return;
+      aplicarSimulacionManual(humedadActual + delta);
+    }
+
+    function cambiarCultivo() {
+      actualizarInterfaz(humedadActual, adcActual);
+      renderizarHistorial(modoSimulacion ? registrosSimulados : registrosReales);
+    }
+
+    // Exportar TODOS los registros exactamente igual que la tabla web (más reciente arriba y con las 7 columnas)
+    function exportarCSV() {
+      const listaOriginal = modoSimulacion ? registrosSimulados : registrosReales;
+      if (listaOriginal.length === 0) {
+        alert("Aún no hay registros para exportar.");
+        return;
+      }
+
+      const cultivoKey = document.getElementById('select-cultivo').value;
+      const c = CULTIVOS[cultivoKey];
+      const origenTexto = modoSimulacion ? "Simulación (2 s)" : "ESP32 Real";
+
+      // Invertir para que las lecturas más recientes queden en las primeras filas del Excel
+      const invertidos = [...listaOriginal].reverse();
+
+      const encabezados = [
+        "Hora",
+        "Cultivo",
+        "Humedad (%)",
+        "ADC Raw (Pin 34)",
+        "Estado Suelo",
+        "Consejo para Huamachuco",
+        "Origen"
+      ];
+
+      const filasCSV = [encabezados.join(";")];
+
+      invertidos.forEach(r => {
+        const d = evaluarEstado(r.humedad, cultivoKey);
+        const consejo = c.recs[d.clave][0].replace(/"/g, '""');
+        const fila = [
+          `"${extraerSoloHora(r.hora)}"`,
+          `"${c.nombre}"`,
+          `"${r.humedad}%"`,
+          `"${r.crudo}"`,
+          `"${d.estado}"`,
+          `"${consejo}"`,
+          `"${origenTexto}"`
+        ];
+        filasCSV.push(fila.join(";"));
+      });
+
+      // \uFEFF asegura que Excel reconozca tildes, ñ y el símbolo % correctamente
+      const contenidoCSV = "\uFEFF" + filasCSV.join("\r\n");
+      const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = modoSimulacion
+        ? "HidroSuelo_Simulacion_Huamachuco.csv"
+        : "HidroSuelo_Historial_Completo_Huamachuco.csv";
+      link.click();
+    }
+
+    setInterval(() => {
+      if (!modoSimulacion) cargarDatosReales();
+    }, 2500);
+
+    actualizarFechaHoraYCiclo(new Date());
+    actualizarBloqueoControles();
+    cargarDatosReales();
+  </script>
+</body>
+</html>
