@@ -172,7 +172,7 @@
       padding: 0 18px;
     }
 
-    /* Barra superior de selección de cultivo y botón de modo */
+    /* Barra superior de selección de cultivo y botón único de modo */
     .barra-controles {
       background: #ffffff;
       padding: 13px 18px;
@@ -326,7 +326,7 @@
       gap: 7px;
     }
 
-    /* NUEVO MODELO DEL CUADRO PRINCIPAL: MONITOREO HÍDRICO DEL SUELO — HIDROSUELO UNCA */
+    /* CUADRO PRINCIPAL: MONITOREO HÍDRICO DEL SUELO — HIDROSUELO UNCA */
     .card-monitoreo-principal {
       background: linear-gradient(180deg, #ffffff 0%, #f6fbf8 100%);
       border: 1px solid #cce3d4;
@@ -588,7 +588,7 @@
 
     <!-- Píldoras clicables que abren cuadro flotante explicativo -->
     <div class="header-pills">
-      <span id="badgeEstado" class="hpill hpill-ok" onclick="mostrarExplicacionPill('estado', this)">Estación: Conectada</span>
+      <span id="badgeEstado" class="hpill hpill-info" onclick="mostrarExplicacionPill('estado', this)">Estación: Verificando...</span>
       <span id="badgeSuelo" class="hpill hpill-info" onclick="mostrarExplicacionPill('suelo', this)">Tierra: Franca</span>
       <span id="pillVoltaje" class="hpill" onclick="mostrarExplicacionPill('voltaje', this)">Energía: -- V</span>
       <span id="pillRuido" class="hpill" onclick="mostrarExplicacionPill('ruido', this)">Cables: --</span>
@@ -649,7 +649,7 @@
     ⚠️ Pilas bajas o cable flojo en la estación: pon a cargar las pilas con el panel al sol o revisa los cables antes de abrir la toma de regadío.
   </div>
 
-  <!-- BLOQUE 1: NUEVO MODELO Y TÍTULO DE ACUERDO AL PROYECTO -->
+  <!-- BLOQUE 1: MONITOREO HÍDRICO DEL SUELO — HIDROSUELO UNCA -->
   <div class="card card-monitoreo-principal">
     <div class="card-titulo-row">
       <div class="card-titulo">💧 Monitoreo Hídrico del Suelo — HidroSuelo UNCA</div>
@@ -835,6 +835,23 @@
     return str;
   }
 
+  // Verifica si el último dato llegó hace 45 segundos o menos
+  function obtenerEstadoConexion(ultimoReg) {
+    if (!ultimoReg) return { enLinea: false, textoTiempo: "sin datos" };
+    const fechaDato = parsearFechaHora(ultimoReg.fecha, ultimoReg.hora);
+    if (!fechaDato) return { enLinea: false, textoTiempo: "hora no válida" };
+
+    const diffSeg = Math.floor((new Date() - fechaDato) / 1000);
+    if (diffSeg <= 45) {
+      return { enLinea: true, textoTiempo: "en tiempo real" };
+    }
+    if (diffSeg < 60) return { enLinea: false, textoTiempo: `hace ${diffSeg} s` };
+    const diffMin = Math.floor(diffSeg / 60);
+    if (diffMin < 60) return { enLinea: false, textoTiempo: `hace ${diffMin} min` };
+    const diffHoras = Math.floor(diffMin / 60);
+    return { enLinea: false, textoTiempo: `hace ${diffHoras} h` };
+  }
+
   // Cuadro flotante explicativo al presionar cualquier píldora del encabezado
   function mostrarExplicacionPill(tipo, elemento) {
     const popover = document.getElementById("popoverTelemetria");
@@ -846,13 +863,19 @@
       crudo: 0, voltaje: 0, ruido: 0, rssi: null, temp: null, uptime: 0, suelo: 1
     };
 
+    const conexion = modoActual === "sim"
+      ? { enLinea: true, textoTiempo: "simulación" }
+      : obtenerEstadoConexion(r);
+
     const info = {
       estado: {
         titulo: "Conexión de la Estación (ESP32)",
         valor: elemento.textContent,
         desc: modoActual === "sim"
           ? "Estás en modo de prueba manual: puedes mover la barra de humedad para ver cómo responde el sistema sin modificar los datos reales de tu parcela."
-          : "Indica si la estación en la chacra está enviando lecturas por internet hacia tu cuaderno en la nube."
+          : (conexion.enLinea
+              ? "La estación en la chacra está prendida y enviando lecturas nuevas cada pocos segundos."
+              : `La estación no envía datos nuevos (${conexion.textoTiempo}). Revisa si tiene batería cargada o si tu celular comparte Wi-Fi en banda 2.4 GHz.`)
       },
       suelo: {
         titulo: "Tipo de Tierra Configurado",
@@ -885,7 +908,7 @@
       },
       uptime: {
         titulo: "Tiempo Prendido sin Apagarse",
-        valor: formatearUptime(r.uptime),
+        valor: conexion.enLinea ? formatearUptime(r.uptime) : "0h 0m (Apagado)",
         desc: "Muestra cuántas horas y minutos lleva trabajando la estación de corrido con su batería y panel solar sin haberse apagado ni reiniciado."
       }
     };
@@ -968,7 +991,6 @@
     };
   }
 
-  // Análisis del suelo con términos de Sánchez Carrión (infiltración, saturado, surcos, camellón)
   function obtenerAnalisisSuelo(humedad, crudo, cultivo) {
     if (crudo < ADC_MINIMO_VALIDO) {
       return "La estación presenta caída de voltaje (< 0.45 V) por batería descargada o falso contacto en el cable de tierra; el dato de humedad actual no es válido hasta recargar las pilas.";
@@ -986,7 +1008,6 @@
     return `Suelo seco (${humedad.toFixed(1)}%): la humedad descendió por debajo del mínimo recomendable (${rango.min}%) para ${cultivo}. La tierra tiene alta capacidad de infiltración y requiere ingreso de agua por los surcos.`;
   }
 
-  // Consejos prácticos para el agricultor en Sánchez Carrión
   function obtenerConsejosChacra(humedad, crudo, cultivo) {
     if (crudo < ADC_MINIMO_VALIDO) {
       return [
@@ -1039,8 +1060,6 @@
   async function cargarDatosVivo() {
     if (modoActual !== "vivo") return;
     const badge = document.getElementById("badgeEstado");
-    badge.className = "hpill hpill-info";
-    badge.textContent = "Estación: Leyendo...";
     try {
       const resp = await fetch(URL_APPS_SCRIPT);
       const data = await resp.json();
@@ -1061,12 +1080,19 @@
         };
       }).reverse();
 
-      badge.className = "hpill hpill-ok";
-      badge.textContent = "Estación: Conectada";
+      const conexion = obtenerEstadoConexion(registros[0]);
+      if (conexion.enLinea) {
+        badge.className = "hpill hpill-ok";
+        badge.textContent = "Estación: Conectada";
+      } else {
+        badge.className = "hpill hpill-err";
+        badge.textContent = `Estación: Desconectada (${conexion.textoTiempo})`;
+      }
+
       renderizarTodo();
     } catch (err) {
       badge.className = "hpill hpill-err";
-      badge.textContent = "Estación: Sin señal";
+      badge.textContent = "Estación: Sin conexión a internet";
     }
   }
 
@@ -1150,29 +1176,48 @@
 
   function actualizarPildorasEncabezado(actual) {
     datosTelemetriaActual = actual;
+    const conexion = modoActual === "sim"
+      ? { enLinea: true, textoTiempo: "simulación" }
+      : obtenerEstadoConexion(actual);
+
     document.getElementById("badgeSuelo").textContent = "Tierra: " + (actual.suelo === 2 ? "Arenosa" : actual.suelo === 3 ? "Gredosa" : "Franca");
 
     const pVolt = document.getElementById("pillVoltaje");
+    const pRuido = document.getElementById("pillRuido");
+    const pWifi = document.getElementById("pillWifi");
+    const pTemp = document.getElementById("pillTemp");
+    const pUp = document.getElementById("pillUptime");
+
+    if (!conexion.enLinea) {
+      pVolt.textContent = `Última energía: ${actual.voltaje.toFixed(2)} V`;
+      pVolt.className = "hpill";
+      pRuido.textContent = "Cables: Sin señal";
+      pRuido.className = "hpill";
+      pWifi.textContent = "Señal: Desconectada";
+      pWifi.className = "hpill hpill-err";
+      pTemp.textContent = `Último calor: ${actual.temp !== null ? actual.temp + " °C" : "--"}`;
+      pUp.textContent = "Prendido: 0h 0m (Apagado)";
+      document.getElementById("heroSubDetalle").textContent = `⚠️ Sin energía o sin Wi-Fi · Último dato guardado: ${actual.fecha} ${actual.hora} (${conexion.textoTiempo})`;
+      return;
+    }
+
     pVolt.textContent = `Energía: ${actual.voltaje.toFixed(2)} V`;
     pVolt.className = actual.crudo < ADC_MINIMO_VALIDO ? "hpill hpill-err" : "hpill hpill-ok";
 
-    const pRuido = document.getElementById("pillRuido");
     pRuido.textContent = actual.ruido > 60 ? "Cables: Revisar" : "Cables: Firmes";
     pRuido.className = actual.ruido > 60 ? "hpill hpill-warn" : "hpill";
 
-    const pWifi = document.getElementById("pillWifi");
     if (actual.rssi !== null) {
       const calidad = actual.rssi >= -65 ? "Buena" : (actual.rssi >= -80 ? "Regular" : "Débil");
       pWifi.textContent = `Señal: ${calidad}`;
+      pWifi.className = "hpill";
     } else {
       pWifi.textContent = "Señal: --";
     }
 
-    const pTemp = document.getElementById("pillTemp");
     pTemp.textContent = actual.temp !== null ? `Calor caja: ${actual.temp} °C` : "Calor caja: -- °C";
-
-    const pUp = document.getElementById("pillUptime");
     pUp.textContent = `Prendido: ${formatearUptime(actual.uptime)}`;
+    document.getElementById("heroSubDetalle").textContent = `Última lectura: ${actual.fecha} · ${actual.hora}`;
   }
 
   function calcularAnalitica() {
@@ -1202,7 +1247,6 @@
     const pct = esBateriaBaja ? 0 : actual.humedad;
     document.getElementById("kpiHumedad").textContent = esBateriaBaja ? "--%" : `${pct.toFixed(1)}%`;
     document.getElementById("tituloEstadoCampo").textContent = estado.titulo;
-    document.getElementById("heroSubDetalle").textContent = `Última lectura: ${actual.fecha} · ${actual.hora}`;
     document.getElementById("marcadorPin").style.left = `${pct}%`;
 
     // Análisis del Suelo + Etiquetas de Infiltración y Saturación
